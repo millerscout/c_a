@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Caseware.Authz/Caseware.Authz.csproj" />
+    <Project Path="src/Caseware.GatewayAuthorizer/Caseware.GatewayAuthorizer.csproj" />
+    <Project Path="src/Caseware.UpdateRoles/Caseware.UpdateRoles.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Caseware.Authz.Tests/Caseware.Authz.Tests.csproj" />
+  </Folder>
+</Solution>

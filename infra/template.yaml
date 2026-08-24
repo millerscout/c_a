@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: HTTP API custom authorizer (payload 2.0) with VPC Lattice / Cloud Map after Allow.
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 256
+    Runtime: dotnet8
+
+Parameters:
+  RedisEndpoint:
+    Type: String
+  CognitoIssuer:
+    Type: String
+  CognitoJwksUrl:
+    Type: String
+  AvpPolicyStoreId:
+    Type: String
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+
+Resources:
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: Caseware.GatewayAuthorizer::Caseware.GatewayAuthorizer.Function::FunctionHandler
+      CodeUri: ../src/Caseware.GatewayAuthorizer
+      Environment:
+        Variables:
+          REDIS_ENDPOINT: !Ref RedisEndpoint
+          COGNITO_ISSUER: !Ref CognitoIssuer
+          COGNITO_JWKS_URL: !Ref CognitoJwksUrl
+          AVP_POLICY_STORE_ID: !Ref AvpPolicyStoreId
+
+  UpdateRolesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: Caseware.UpdateRoles::Caseware.UpdateRoles.Function::FunctionHandler
+      CodeUri: ../src/Caseware.UpdateRoles
+      Environment:
+        Variables:
+          REDIS_ENDPOINT: !Ref RedisEndpoint
+          AVP_POLICY_STORE_ID: !Ref AvpPolicyStoreId
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Auth:
+        DefaultAuthorizer: CustomAuth
+        Authorizers:
+          CustomAuth:
+            FunctionArn: !GetAtt AuthorizerFunction.Arn
+            AuthorizerPayloadFormatVersion: "2.0"
+            EnableSimpleResponses: true
+            IdentitySource: "$request.header.Authorization"
+            AuthorizerResultTtlInSeconds: 0
+
+  WorkspaceRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "ANY /{proxy+}"
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref HttpApiCustomAuth
+      Target: !Sub integrations/${WorkspaceIntegration}
+
+  HttpApiCustomAuth:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref HttpApi
+      AuthorizerType: REQUEST
+      Name: custom-authz
+      AuthorizerUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerFunction.Arn}/invocations
+      AuthorizerPayloadFormatVersion: "2.0"
+      EnableSimpleResponses: true
+      AuthorizerResultTtlInSeconds: 0
+      IdentitySource:
+        - "$request.header.Authorization"
+
+  VpcLink:
+    Type: AWS::ApiGatewayV2::VpcLink
+    Properties:
+      Name: workspace-vpc-link
+      SubnetIds: !Ref PrivateSubnetIds
+
+  CloudMapNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: caseware.internal
+      Vpc: !Ref VpcId
+
+  CloudMapService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: workspace
+      NamespaceId: !Ref CloudMapNamespace
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 10
+
+  LatticeService:
+    Type: AWS::VpcLattice::Service
+    Properties:
+      Name: workspace-lattice
+      AuthType: AWS_IAM
+
+  LatticeTargetGroup:
+    Type: AWS::VpcLattice::TargetGroup
+    Properties:
+      Type: IP
+      Config:
+        Port: 443
+        Protocol: HTTPS
+        VpcIdentifier: !Ref VpcId
+
+  WorkspaceIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: ANY
+      ConnectionType: VPC_LINK
+      ConnectionId: !Ref VpcLink
+      IntegrationUri: !GetAtt CloudMapService.Arn
+      PayloadFormatVersion: "1.0"
+      RequestParameters:
+        "overwrite:header.x-sub": "$context.authorizer.sub"
+        "overwrite:header.x-azp": "$context.authorizer.azp"
+        "overwrite:header.x-roles": "$context.authorizer.roles"
+
+Outputs:
+  HttpApiUrl:
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com

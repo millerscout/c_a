@@ -1,0 +1,51 @@
+# Build
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+TestResults/
+*.dll
+*.exe
+*.pdb
+
+# NuGet (local feed is not source)
+nupkgs/
+nupkgs/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# IDE / editor
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# Local runtime / compose
+.podman/
+*.log
+.env
+.env.*
+!.env.example
+
+# AWS SAM
+.aws-sam/
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml

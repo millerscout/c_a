@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Caseware.Authz.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Caseware.Authz\Caseware.Authz.csproj" />
+    <ProjectReference Include="..\..\src\Caseware.GatewayAuthorizer\Caseware.GatewayAuthorizer.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\infra\template.yaml" Link="infra\template.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
